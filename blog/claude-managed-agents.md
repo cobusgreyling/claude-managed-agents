@@ -1,3 +1,5 @@
+![Four Ways To Build AI Agents with Anthropic](images/four-paradigms.png)
+
 # Claude Managed Agents: The Fourth Way to Build AI Agents With Claude
 
 In a recent post, I explored the [Three Ways to Build AI Agents With Claude](https://cobusgreyling.medium.com/three-ways-to-build-ai-agents-with-claude-54db80194127) — the Agent SDK, Markdown Agent Definitions, and Agent Teams. My core thesis was that Anthropic is doing something unusual: rather than consolidating around a single framework like most AI platforms, they're shipping multiple paradigms simultaneously, trusting developers to pick the right abstraction for the problem at hand.
