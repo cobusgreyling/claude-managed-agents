@@ -23,7 +23,12 @@ def run_team_audit(target_path: str) -> str:
     Spawn a team of specialised agents that collaborate on the audit.
     Each agent has a distinct role and perspective.
     """
-    code = Path(target_path).read_text()
+    path = Path(target_path)
+    if not path.exists():
+        print(f"Error: File not found: {path}")
+        sys.exit(1)
+
+    code: str = path.read_text()
 
     # Define specialised agents
     vuln_hunter = Agent(
@@ -66,11 +71,10 @@ def run_team_audit(target_path: str) -> str:
     )
 
     # Let the team collaborate on the audit
+    agents: list[Agent] = [vuln_hunter, auth_reviewer, best_practices, report_writer]
     print("Assembling agent team...")
-    print(f"  - {vuln_hunter.name}")
-    print(f"  - {auth_reviewer.name}")
-    print(f"  - {best_practices.name}")
-    print(f"  - {report_writer.name}")
+    for agent in agents:
+        print(f"  - {agent.name}")
     print("=" * 60)
 
     result = team.run(
@@ -88,13 +92,13 @@ def run_team_audit(target_path: str) -> str:
     return result.final_output
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: python team_audit.py <path-to-file>")
         sys.exit(1)
 
-    target = sys.argv[1]
-    report = run_team_audit(target)
+    target: str = sys.argv[1]
+    report: str = run_team_audit(target)
 
     print("\n" + "=" * 60)
     print("TEAM AUDIT REPORT")

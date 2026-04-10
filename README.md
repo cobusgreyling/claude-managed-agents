@@ -19,12 +19,12 @@ All four examples audit [`sample_target/app.py`](sample_target/app.py) — a del
 
 ## The Four Approaches
 
-| # | Approach | Code | You Own the Runtime? | Key File |
-|---|----------|------|---------------------|----------|
-| 1 | [**Agent SDK**](examples/01_agent_sdk/) | ~120 lines Python | Yes | [`audit_agent.py`](examples/01_agent_sdk/audit_agent.py) |
-| 2 | [**Markdown Definitions**](examples/02_markdown_definitions/) | ~50 lines Markdown | Yes | [`security-auditor.md`](examples/02_markdown_definitions/security-auditor.md) |
-| 3 | [**Agent Teams**](examples/03_agent_teams/) | ~70 lines Python | Partially | [`team_audit.py`](examples/03_agent_teams/team_audit.py) |
-| 4 | [**Managed Agents**](examples/04_managed_agents/) | ~30 lines Python | No | [`audit_agent.py`](examples/04_managed_agents/audit_agent.py) |
+| # | Approach | Code | You Own the Runtime? | Key File | Sample Output |
+|---|----------|------|---------------------|----------|---------------|
+| 1 | [**Agent SDK**](examples/01_agent_sdk/) | ~120 lines Python | Yes | [`audit_agent.py`](examples/01_agent_sdk/audit_agent.py) | [View](examples/01_agent_sdk/sample_output.md) |
+| 2 | [**Markdown Definitions**](examples/02_markdown_definitions/) | ~50 lines Markdown | Yes | [`security-auditor.md`](examples/02_markdown_definitions/security-auditor.md) | [View](examples/02_markdown_definitions/sample_output.md) |
+| 3 | [**Agent Teams**](examples/03_agent_teams/) | ~70 lines Python | Partially | [`team_audit.py`](examples/03_agent_teams/team_audit.py) | [View](examples/03_agent_teams/sample_output.md) |
+| 4 | [**Managed Agents**](examples/04_managed_agents/) | ~30 lines Python | No | [`audit_agent.py`](examples/04_managed_agents/audit_agent.py) | [View](examples/04_managed_agents/sample_output.md) |
 
 ### The Pattern
 
@@ -39,7 +39,15 @@ Managed Agents     → You order from a restaurant
 
 ## Quick Start
 
-Each example is self-contained. Pick one and run it:
+### Run everything at once
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+make install    # Install all dependencies
+make run-all    # Run approaches 1, 3, and 4 sequentially
+```
+
+### Run individually
 
 ```bash
 # Set your API key
@@ -62,7 +70,7 @@ python team_audit.py ../../sample_target/app.py
 # Approach 4: Managed Agents
 cd examples/04_managed_agents
 pip install -r requirements.txt
-python audit_agent.py
+python audit_agent.py ../../sample_target/app.py
 ```
 
 ---
@@ -73,6 +81,21 @@ python audit_agent.py
 2. **Control decreases** in the same direction — that's the trade-off
 3. **Infrastructure responsibility shifts** from you to Anthropic
 4. **The audit output is comparable** across all four — the *what* stays the same, only the *how* changes
+
+---
+
+## Cost & Latency Comparison
+
+Approximate figures from auditing `sample_target/app.py` (157 lines). Costs based on Claude Sonnet 4.6 pricing ($3/MTok input, $15/MTok output).
+
+| Approach | Input Tokens | Output Tokens | Est. Cost | Latency | Notes |
+|----------|-------------|---------------|-----------|---------|-------|
+| Agent SDK | ~8K | ~4K | ~$0.08 | ~8s | 2-3 tool call rounds |
+| Markdown Definitions | ~6K | ~4K | ~$0.08 | ~10s | Runs inside Claude Code |
+| Agent Teams | ~35K | ~15K | ~$0.33 | ~30s | 4 agents × multi-turn |
+| Managed Agents | ~8K | ~4K | ~$0.08 + session | ~12s | + $0.08/session-hour |
+
+**Key takeaway:** Approaches 1, 2, and 4 have similar token costs for single-file audits. Agent Teams (Approach 3) uses significantly more tokens due to multi-agent conversation overhead but produces richer, multi-perspective analysis.
 
 ---
 

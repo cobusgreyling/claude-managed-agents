@@ -11,133 +11,104 @@ Requirements:
 
 Usage:
     export ANTHROPIC_API_KEY=sk-ant-...
-    python audit_agent.py
+    python audit_agent.py ../../sample_target/app.py
 """
 
-from anthropic import Anthropic
+import sys
+from pathlib import Path
 
-client = Anthropic()
+from anthropic import Anthropic, APIError
 
-# Step 1: Create the agent (one-time setup, reuse the ID after)
-agent = client.beta.agents.create(
-    name="Security Auditor",
-    model="claude-sonnet-4-6",
-    system="""You are a senior security auditor. Analyse any code provided
-    and produce a structured audit report covering: critical vulnerabilities,
-    authentication flaws, data exposure risks, and best-practice violations.
-    Include severity ratings, locations, and recommended fixes.""",
-    tools=[{"type": "agent_toolset_20260401"}],
-)
 
-# Step 2: Create a sandboxed environment
-environment = client.beta.environments.create(
-    name="audit-env",
-    config={
-        "type": "cloud",
-        "networking": {"type": "restricted"},
-    },
-)
+def run_audit(target_path: str) -> str:
+    """Run a managed agent audit on the target file."""
+    path = Path(target_path)
+    if not path.exists():
+        print(f"Error: File not found: {path}")
+        sys.exit(1)
 
-# Step 3: Start a session
-session = client.beta.sessions.create(
-    agent=agent.id,
-    environment_id=environment.id,
-    title="Security Audit",
-)
+    code: str = path.read_text()
+    client = Anthropic()
 
-# Step 4: Send the task and stream results
-with client.beta.sessions.events.stream(session.id) as stream:
-    client.beta.sessions.events.send(
-        session.id,
-        events=[{
-            "type": "user.message",
-            "content": [{
-                "type": "text",
-                "text": """Audit this Flask application for security vulnerabilities:
+    try:
+        # Step 1: Create the agent (one-time setup, reuse the ID after)
+        agent = client.beta.agents.create(
+            name="Security Auditor",
+            model="claude-sonnet-4-6",
+            system="""You are a senior security auditor. Analyse any code provided
+            and produce a structured audit report covering: critical vulnerabilities,
+            authentication flaws, data exposure risks, and best-practice violations.
+            Include severity ratings, locations, and recommended fixes.""",
+            tools=[{"type": "agent_toolset_20260401"}],
+        )
 
-```python
-import os, sqlite3, hashlib
-from flask import Flask, request, jsonify, render_template_string
+        # Step 2: Create a sandboxed environment
+        environment = client.beta.environments.create(
+            name="audit-env",
+            config={
+                "type": "cloud",
+                "networking": {"type": "restricted"},
+            },
+        )
 
-app = Flask(__name__)
-DATABASE = os.getenv("DATABASE_PATH", "app.db")
+        # Step 3: Start a session
+        session = client.beta.sessions.create(
+            agent=agent.id,
+            environment_id=environment.id,
+            title="Security Audit",
+        )
+    except APIError as e:
+        print(f"Error setting up managed agent: {e}")
+        return f"Audit could not be completed: {e}"
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    # Step 4: Send the task and stream results
+    output_parts: list[str] = []
 
-@app.route("/register", methods=["POST"])
-def register():
-    data = request.get_json()
-    password_hash = hashlib.md5(data["password"].encode()).hexdigest()
-    db = get_db()
-    db.execute(f"INSERT INTO users (username, password, email) VALUES ('{data['username']}', '{password_hash}', '{data.get('email', '')}')")
-    db.commit()
-    return jsonify({"status": "ok"})
+    with client.beta.sessions.events.stream(session.id) as stream:
+        client.beta.sessions.events.send(
+            session.id,
+            events=[{
+                "type": "user.message",
+                "content": [{
+                    "type": "text",
+                    "text": (
+                        "Audit this Flask application for security "
+                        "vulnerabilities:\n\n"
+                        f"```python\n{code}\n```\n\n"
+                        "Produce a full security audit report in Markdown format."
+                    ),
+                }],
+            }],
+        )
 
-@app.route("/login", methods=["POST"])
-def login():
-    data = request.get_json()
-    password_hash = hashlib.md5(data["password"].encode()).hexdigest()
-    db = get_db()
-    row = db.execute(f"SELECT * FROM users WHERE username='{data['username']}' AND password='{password_hash}'").fetchone()
-    if row:
-        return jsonify({"status": "ok", "role": row["role"]})
-    return jsonify({"status": "error"}), 401
+        for event in stream:
+            match event.type:
+                case "agent.message":
+                    for block in event.content:
+                        if hasattr(block, "text"):
+                            print(block.text, end="")
+                            output_parts.append(block.text)
+                case "agent.tool_use":
+                    print(f"\n  [Tool: {event.name}]")
+                case "session.status_idle":
+                    print("\n\nAudit complete.")
+                    break
 
-@app.route("/notes", methods=["GET"])
-def list_notes():
-    user_id = request.args.get("user_id")
-    db = get_db()
-    rows = db.execute(f"SELECT * FROM notes WHERE user_id={user_id}").fetchall()
-    return jsonify([dict(r) for r in rows])
+    return "".join(output_parts)
 
-@app.route("/notes/<int:note_id>", methods=["DELETE"])
-def delete_note(note_id):
-    db = get_db()
-    db.execute("DELETE FROM notes WHERE id=?", (note_id,))
-    db.commit()
-    return jsonify({"status": "deleted"})
 
-@app.route("/admin/users")
-def admin_users():
-    db = get_db()
-    rows = db.execute("SELECT id, username, email, role FROM users").fetchall()
-    return jsonify([dict(r) for r in rows])
+def main() -> None:
+    if len(sys.argv) < 2:
+        print("Usage: python audit_agent.py <path-to-file>")
+        sys.exit(1)
 
-@app.route("/admin/run", methods=["POST"])
-def admin_run():
-    code = request.get_json().get("code", "")
-    result = eval(code)
-    return jsonify({"result": str(result)})
+    target = sys.argv[1]
+    report = run_audit(target)
 
-@app.route("/profile/<username>")
-def profile(username):
-    html = f"<h1>Profile: {username}</h1>"
-    return render_template_string(html)
+    output_path = Path("audit_report.md")
+    output_path.write_text(report)
+    print(f"\nReport saved to {output_path}")
 
-@app.route("/config")
-def config():
-    return jsonify(dict(os.environ))
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8080)
-```
-
-Produce a full security audit report in Markdown format.""",
-            }],
-        }],
-    )
-
-    for event in stream:
-        match event.type:
-            case "agent.message":
-                for block in event.content:
-                    if hasattr(block, "text"):
-                        print(block.text, end="")
-            case "agent.tool_use":
-                print(f"\n  [Tool: {event.name}]")
-            case "session.status_idle":
-                print("\n\nAudit complete.")
-                break
+    main()

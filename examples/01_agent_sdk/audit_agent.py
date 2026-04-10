@@ -14,9 +14,11 @@ Usage:
 
 import json
 import sys
+import time
 from pathlib import Path
+from typing import Any
 
-from anthropic import Anthropic
+from anthropic import Anthropic, APIError, APITimeoutError
 
 SYSTEM_PROMPT = """You are a senior security auditor. Analyse the provided source code
 and produce a structured audit report covering:
@@ -35,7 +37,7 @@ For each finding, include:
 End with an executive summary and an overall risk rating."""
 
 # Tools the agent can call — we implement them ourselves
-TOOLS = [
+TOOLS: list[dict[str, Any]] = [
     {
         "name": "read_file",
         "description": "Read the contents of a file at the given path.",
@@ -66,8 +68,11 @@ TOOLS = [
     },
 ]
 
+MAX_RETRIES: int = 3
+RETRY_BASE_DELAY: float = 1.0
 
-def handle_tool_call(name: str, input_data: dict) -> str:
+
+def handle_tool_call(name: str, input_data: dict[str, Any]) -> str:
     """Execute a tool call and return the result as a string."""
     if name == "read_file":
         path = Path(input_data["path"])
@@ -92,7 +97,7 @@ def run_audit(target_path: str) -> str:
       3. Repeat until Claude produces a final text response.
     """
     client = Anthropic()
-    messages = [
+    messages: list[dict[str, Any]] = [
         {
             "role": "user",
             "content": f"Please audit the code in this file: {target_path}",
@@ -103,20 +108,43 @@ def run_audit(target_path: str) -> str:
     print("=" * 60)
 
     while True:
-        # Call Claude
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            tools=TOOLS,
-            messages=messages,
-        )
+        # Call Claude with retry logic for transient API errors
+        response = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=4096,
+                    system=SYSTEM_PROMPT,
+                    tools=TOOLS,
+                    messages=messages,
+                )
+                break
+            except APITimeoutError:
+                if attempt < MAX_RETRIES - 1:
+                    delay = RETRY_BASE_DELAY * (2 ** attempt)
+                    print(f"  [Timeout, retrying in {delay:.0f}s...]")
+                    time.sleep(delay)
+                else:
+                    print("  [Error: API timeout after all retries]")
+                    return "Audit could not be completed: API timeout."
+            except APIError as e:
+                if e.status_code and e.status_code >= 500 and attempt < MAX_RETRIES - 1:
+                    delay = RETRY_BASE_DELAY * (2 ** attempt)
+                    print(f"  [Server error {e.status_code}, retrying in {delay:.0f}s...]")
+                    time.sleep(delay)
+                else:
+                    print(f"  [Error: {e}]")
+                    return f"Audit could not be completed: {e}"
+
+        if response is None:
+            return "Audit could not be completed: no response from API."
 
         # Check if Claude wants to use tools
         if response.stop_reason == "tool_use":
             # Collect all tool uses from this response
             assistant_content = response.content
-            tool_results = []
+            tool_results: list[dict[str, Any]] = []
 
             for block in assistant_content:
                 if block.type == "tool_use":
@@ -149,13 +177,13 @@ def run_audit(target_path: str) -> str:
     return "Audit could not be completed."
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: python audit_agent.py <path-to-file>")
         sys.exit(1)
 
-    target = sys.argv[1]
-    report = run_audit(target)
+    target: str = sys.argv[1]
+    report: str = run_audit(target)
 
     print("\n" + "=" * 60)
     print("AUDIT REPORT")

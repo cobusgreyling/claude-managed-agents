@@ -20,7 +20,7 @@ That's it. No agent loop. No tool schemas. No tool handlers. No state management
 ```bash
 pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
-python audit_agent.py
+python audit_agent.py ../../sample_target/app.py
 ```
 
 ## The Key Difference
