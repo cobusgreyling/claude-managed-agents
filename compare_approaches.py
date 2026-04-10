@@ -52,9 +52,9 @@ def count_findings(report_path: str) -> dict[str, int]:
 
 def run_approach(approach: dict) -> dict:
     """Run a single approach and collect metrics."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Running: {approach['name']}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     start: float = time.time()
     result = subprocess.run(
@@ -86,9 +86,9 @@ def run_approach(approach: dict) -> dict:
 
 def print_table(results: list[dict]) -> None:
     """Print a comparison table."""
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print("COMPARISON RESULTS")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
     print(
         f"{'Approach':<20} {'Status':<10} {'Time':>8} {'Lines':>7} "
         f"{'Crit':>6} {'High':>6} {'Med':>6} {'Low':>6}"
@@ -129,14 +129,16 @@ def main() -> None:
         try:
             results.append(run_approach(approach))
         except subprocess.TimeoutExpired:
-            results.append({
-                "name": approach["name"],
-                "success": False,
-                "elapsed": 120.0,
-                "findings": {},
-                "report_lines": 0,
-                "stderr": "Timed out after 120s",
-            })
+            results.append(
+                {
+                    "name": approach["name"],
+                    "success": False,
+                    "elapsed": 120.0,
+                    "findings": {},
+                    "report_lines": 0,
+                    "stderr": "Timed out after 120s",
+                }
+            )
 
     print_table(results)
 

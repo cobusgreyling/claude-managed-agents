@@ -122,7 +122,7 @@ def run_audit(target_path: str) -> str:
                 break
             except APITimeoutError:
                 if attempt < MAX_RETRIES - 1:
-                    delay = RETRY_BASE_DELAY * (2 ** attempt)
+                    delay = RETRY_BASE_DELAY * (2**attempt)
                     print(f"  [Timeout, retrying in {delay:.0f}s...]")
                     time.sleep(delay)
                 else:
@@ -130,7 +130,7 @@ def run_audit(target_path: str) -> str:
                     return "Audit could not be completed: API timeout."
             except APIError as e:
                 if e.status_code and e.status_code >= 500 and attempt < MAX_RETRIES - 1:
-                    delay = RETRY_BASE_DELAY * (2 ** attempt)
+                    delay = RETRY_BASE_DELAY * (2**attempt)
                     print(f"  [Server error {e.status_code}, retrying in {delay:.0f}s...]")
                     time.sleep(delay)
                 else:

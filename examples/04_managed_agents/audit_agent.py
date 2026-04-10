@@ -16,7 +16,6 @@ Usage:
 
 import sys
 from pathlib import Path
-from typing import Any
 
 from anthropic import Anthropic, APIError
 
@@ -69,18 +68,22 @@ def run_audit(target_path: str) -> str:
         with client.beta.sessions.events.stream(session.id) as stream:
             client.beta.sessions.events.send(
                 session.id,
-                events=[{
-                    "type": "user.message",
-                    "content": [{
-                        "type": "text",
-                        "text": (
-                            "Audit this Flask application for security "
-                            "vulnerabilities:\n\n"
-                            f"```python\n{code}\n```\n\n"
-                            "Produce a full security audit report in Markdown format."
-                        ),
-                    }],
-                }],
+                events=[
+                    {
+                        "type": "user.message",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    "Audit this Flask application for security "
+                                    "vulnerabilities:\n\n"
+                                    f"```python\n{code}\n```\n\n"
+                                    "Produce a full security audit report in Markdown format."
+                                ),
+                            }
+                        ],
+                    }
+                ],
             )
 
             for event in stream:

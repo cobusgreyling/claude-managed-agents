@@ -3,11 +3,11 @@ Sample Flask application with intentional code quality issues.
 This is the target that all four agent paradigms will audit.
 """
 
+import hashlib
 import os
 import sqlite3
-import hashlib
 
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, request
 
 app = Flask(__name__)
 DATABASE = os.getenv("DATABASE_PATH", "app.db")
@@ -44,6 +44,7 @@ def init_db():
 
 # --- Authentication ---
 
+
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
@@ -57,7 +58,8 @@ def register():
     db = get_db()
     # Issue: SQL injection via string formatting
     db.execute(
-        f"INSERT INTO users (username, password, email) VALUES ('{username}', '{password_hash}', '{email}')"
+        f"INSERT INTO users (username, password, email) VALUES "
+        f"('{username}', '{password_hash}', '{email}')"
     )
     db.commit()
     return jsonify({"status": "ok", "message": f"User {username} created"})
@@ -84,6 +86,7 @@ def login():
 
 
 # --- Notes CRUD ---
+
 
 @app.route("/notes", methods=["GET"])
 def list_notes():
@@ -117,6 +120,7 @@ def delete_note(note_id):
 
 # --- Admin ---
 
+
 @app.route("/admin/users")
 def admin_users():
     # Issue: no auth/role check for admin endpoint
@@ -135,6 +139,7 @@ def admin_run():
 
 # --- Rendering ---
 
+
 @app.route("/profile/<username>")
 def profile(username):
     # Issue: XSS via reflected user input in template
@@ -143,6 +148,7 @@ def profile(username):
 
 
 # --- Config ---
+
 
 @app.route("/config")
 def config():

@@ -40,10 +40,14 @@ jobs:
       - name: Check that referenced files exist
         run: |
           status=0
-          while IFS= read -r link; do
-            if [ ! -e "$link" ]; then
-              echo "BROKEN: $link"
-              status=1
-            fi
-          done < <(grep -ohrP '(?<=\()([^)]+\.(?:py|md|txt|png))(?=\))' README.md blog/ examples/ --include='*.md' | sort -u)
+          while IFS= read -r file; do
+            dir=$(dirname "$file")
+            while IFS= read -r link; do
+              resolved="$dir/$link"
+              if [ ! -e "$resolved" ]; then
+                echo "BROKEN: $link (in $file, resolved to $resolved)"
+                status=1
+              fi
+            done < <(grep -oP '(?<=\()([^)]+\.(?:py|md|txt|png))(?=\))' "$file")
+          done < <(find README.md blog/ examples/ -name '*.md')
           exit $status
