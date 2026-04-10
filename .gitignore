@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.db
+audit_report.md
+team_audit_report.md
+.DS_Store
+venv/
+.venv/
