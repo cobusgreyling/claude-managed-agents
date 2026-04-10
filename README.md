@@ -37,6 +37,20 @@ Managed Agents     → You order from a restaurant
 
 ---
 
+## Prerequisites
+
+- **Python 3.10+** (required for `match`/`case` syntax in Approach 4)
+- An [Anthropic API key](https://console.anthropic.com/)
+- Copy `.env.example` to `.env` and fill in your key, or export it directly
+
+```bash
+cp .env.example .env   # then edit with your key
+# or
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+---
+
 ## Quick Start
 
 ### Run everything at once
@@ -55,7 +69,6 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 # Approach 1: Agent SDK
 cd examples/01_agent_sdk
-pip install -r requirements.txt
 python audit_agent.py ../../sample_target/app.py
 
 # Approach 2: Markdown Definitions
@@ -64,14 +77,22 @@ cp examples/02_markdown_definitions/security-auditor.md ~/.claude/agents/
 
 # Approach 3: Agent Teams
 cd examples/03_agent_teams
-pip install -r requirements.txt
 python team_audit.py ../../sample_target/app.py
 
 # Approach 4: Managed Agents
 cd examples/04_managed_agents
-pip install -r requirements.txt
 python audit_agent.py ../../sample_target/app.py
 ```
+
+### Compare approaches side by side
+
+```bash
+python compare_approaches.py
+# or
+make compare
+```
+
+This runs Approaches 1, 3, and 4 against the sample target and prints a summary table with timing, report length, and finding counts.
 
 ---
 
@@ -111,12 +132,14 @@ The full blog post with architecture diagrams, pricing details, and strategic an
 
 ---
 
-## Prerequisites
+## Running the Sample Target
 
-- Python 3.10+
-- An [Anthropic API key](https://console.anthropic.com/)
-- `pip install anthropic` (all approaches)
-- `pip install claude-agent-sdk` (Approach 3 only)
+To run the deliberately vulnerable Flask app locally (e.g. for live testing):
+
+```bash
+make install-target   # or: pip install flask
+python sample_target/app.py
+```
 
 ---
 

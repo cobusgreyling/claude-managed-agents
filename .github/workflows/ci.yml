@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  syntax-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m py_compile examples/01_agent_sdk/audit_agent.py
+      - run: python -m py_compile examples/03_agent_teams/team_audit.py
+      - run: python -m py_compile examples/04_managed_agents/audit_agent.py
+      - run: python -m py_compile sample_target/app.py
+
+  validate-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check that referenced files exist
+        run: |
+          status=0
+          while IFS= read -r link; do
+            if [ ! -e "$link" ]; then
+              echo "BROKEN: $link"
+              status=1
+            fi
+          done < <(grep -ohrP '(?<=\()([^)]+\.(?:py|md|txt|png))(?=\))' README.md blog/ examples/ --include='*.md' | sort -u)
+          exit $status

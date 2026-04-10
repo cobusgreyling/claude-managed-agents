@@ -13,9 +13,15 @@ Usage:
 """
 
 import sys
+import time
 from pathlib import Path
+from typing import Any
 
+from anthropic import APIError, APITimeoutError
 from claude_agent_sdk import AgentTeam, Agent
+
+MAX_RETRIES: int = 3
+RETRY_BASE_DELAY: float = 1.0
 
 
 def run_team_audit(target_path: str) -> str:
@@ -23,7 +29,7 @@ def run_team_audit(target_path: str) -> str:
     Spawn a team of specialised agents that collaborate on the audit.
     Each agent has a distinct role and perspective.
     """
-    path = Path(target_path)
+    path: Path = Path(target_path)
     if not path.exists():
         print(f"Error: File not found: {path}")
         sys.exit(1)
@@ -31,7 +37,7 @@ def run_team_audit(target_path: str) -> str:
     code: str = path.read_text()
 
     # Define specialised agents
-    vuln_hunter = Agent(
+    vuln_hunter: Agent = Agent(
         name="Vulnerability Hunter",
         role="""You are an offensive security specialist. Your job is to find
         exploitable vulnerabilities: SQL injection, XSS, RCE, SSRF, path
@@ -39,7 +45,7 @@ def run_team_audit(target_path: str) -> str:
         how an attacker would exploit it and rate the severity.""",
     )
 
-    auth_reviewer = Agent(
+    auth_reviewer: Agent = Agent(
         name="Auth Reviewer",
         role="""You are an authentication and authorisation specialist. Review
         all auth flows, session management, password handling, and access
@@ -47,7 +53,7 @@ def run_team_audit(target_path: str) -> str:
         escalation paths.""",
     )
 
-    best_practices = Agent(
+    best_practices: Agent = Agent(
         name="Best Practices Reviewer",
         role="""You are a Python/Flask best-practices expert. Review code
         quality, configuration safety, error handling, and deployment
@@ -55,7 +61,7 @@ def run_team_audit(target_path: str) -> str:
         validation, and dependency issues.""",
     )
 
-    report_writer = Agent(
+    report_writer: Agent = Agent(
         name="Report Writer",
         role="""You are a technical writer who synthesises security findings
         into a clear, actionable audit report. Combine inputs from other
@@ -65,7 +71,7 @@ def run_team_audit(target_path: str) -> str:
     )
 
     # Create the team
-    team = AgentTeam(
+    team: AgentTeam = AgentTeam(
         agents=[vuln_hunter, auth_reviewer, best_practices, report_writer],
         model="claude-sonnet-4-6",
     )
@@ -77,19 +83,38 @@ def run_team_audit(target_path: str) -> str:
         print(f"  - {agent.name}")
     print("=" * 60)
 
-    result = team.run(
-        task=f"""Perform a comprehensive security audit of the following
-        Python Flask application. Each specialist should review from their
-        perspective, then the Report Writer should compile everything into
-        a single structured report.
+    task: str = f"""Perform a comprehensive security audit of the following
+    Python Flask application. Each specialist should review from their
+    perspective, then the Report Writer should compile everything into
+    a single structured report.
 
-        Source code:
-        ```python
-        {code}
-        ```"""
-    )
+    Source code:
+    ```python
+    {code}
+    ```"""
 
-    return result.final_output
+    for attempt in range(MAX_RETRIES):
+        try:
+            result: Any = team.run(task=task)
+            return result.final_output
+        except APITimeoutError:
+            if attempt < MAX_RETRIES - 1:
+                delay: float = RETRY_BASE_DELAY * (2 ** attempt)
+                print(f"  [Timeout, retrying in {delay:.0f}s...]")
+                time.sleep(delay)
+            else:
+                print("  [Error: API timeout after all retries]")
+                return "Audit could not be completed: API timeout."
+        except APIError as e:
+            if e.status_code and e.status_code >= 500 and attempt < MAX_RETRIES - 1:
+                delay = RETRY_BASE_DELAY * (2 ** attempt)
+                print(f"  [Server error {e.status_code}, retrying in {delay:.0f}s...]")
+                time.sleep(delay)
+            else:
+                print(f"  [Error: {e}]")
+                return f"Audit could not be completed: {e}"
+
+    return "Audit could not be completed: no response from API."
 
 
 def main() -> None:

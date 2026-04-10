@@ -14,16 +14,17 @@
 
 TARGET ?= sample_target/app.py
 
-.PHONY: install install-md run-sdk run-teams run-managed run-all clean help
+.PHONY: install install-md run-sdk run-teams run-managed run-all compare lint clean help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
 
 install: ## Install dependencies for all approaches
-	pip install -r examples/01_agent_sdk/requirements.txt
-	pip install -r examples/03_agent_teams/requirements.txt
-	pip install -r examples/04_managed_agents/requirements.txt
+	pip install -e ".[teams]"
+
+install-target: ## Install dependencies to run the sample Flask target
+	pip install -e ".[target]"
 
 install-md: ## Copy Markdown agent definition to Claude Code agents directory
 	@mkdir -p ~/.claude/agents
@@ -49,6 +50,13 @@ run-all: run-sdk run-teams run-managed ## Run all programmatic approaches sequen
 	@echo "  examples/01_agent_sdk/audit_report.md"
 	@echo "  examples/03_agent_teams/team_audit_report.md"
 	@echo "  examples/04_managed_agents/audit_report.md"
+
+compare: ## Run all approaches and print a side-by-side comparison
+	python compare_approaches.py
+
+lint: ## Lint all Python files with ruff
+	ruff check .
+	ruff format --check .
 
 clean: ## Remove generated audit reports
 	rm -f examples/01_agent_sdk/audit_report.md

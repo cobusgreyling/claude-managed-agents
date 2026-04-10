@@ -16,19 +16,20 @@ Usage:
 
 import sys
 from pathlib import Path
+from typing import Any
 
 from anthropic import Anthropic, APIError
 
 
 def run_audit(target_path: str) -> str:
     """Run a managed agent audit on the target file."""
-    path = Path(target_path)
+    path: Path = Path(target_path)
     if not path.exists():
         print(f"Error: File not found: {path}")
         sys.exit(1)
 
     code: str = path.read_text()
-    client = Anthropic()
+    client: Anthropic = Anthropic()
 
     try:
         # Step 1: Create the agent (one-time setup, reuse the ID after)
@@ -64,35 +65,46 @@ def run_audit(target_path: str) -> str:
     # Step 4: Send the task and stream results
     output_parts: list[str] = []
 
-    with client.beta.sessions.events.stream(session.id) as stream:
-        client.beta.sessions.events.send(
-            session.id,
-            events=[{
-                "type": "user.message",
-                "content": [{
-                    "type": "text",
-                    "text": (
-                        "Audit this Flask application for security "
-                        "vulnerabilities:\n\n"
-                        f"```python\n{code}\n```\n\n"
-                        "Produce a full security audit report in Markdown format."
-                    ),
+    try:
+        with client.beta.sessions.events.stream(session.id) as stream:
+            client.beta.sessions.events.send(
+                session.id,
+                events=[{
+                    "type": "user.message",
+                    "content": [{
+                        "type": "text",
+                        "text": (
+                            "Audit this Flask application for security "
+                            "vulnerabilities:\n\n"
+                            f"```python\n{code}\n```\n\n"
+                            "Produce a full security audit report in Markdown format."
+                        ),
+                    }],
                 }],
-            }],
-        )
+            )
 
-        for event in stream:
-            match event.type:
-                case "agent.message":
-                    for block in event.content:
-                        if hasattr(block, "text"):
-                            print(block.text, end="")
-                            output_parts.append(block.text)
-                case "agent.tool_use":
-                    print(f"\n  [Tool: {event.name}]")
-                case "session.status_idle":
-                    print("\n\nAudit complete.")
-                    break
+            for event in stream:
+                match event.type:
+                    case "agent.message":
+                        for block in event.content:
+                            if hasattr(block, "text"):
+                                print(block.text, end="")
+                                output_parts.append(block.text)
+                    case "agent.tool_use":
+                        print(f"\n  [Tool: {event.name}]")
+                    case "session.status_error":
+                        error_msg: str = getattr(event, "error", "Unknown error")
+                        print(f"\n  [Session error: {error_msg}]")
+                        if not output_parts:
+                            return f"Audit could not be completed: {error_msg}"
+                        break
+                    case "session.status_idle":
+                        print("\n\nAudit complete.")
+                        break
+    except APIError as e:
+        print(f"\n  [Streaming error: {e}]")
+        if not output_parts:
+            return f"Audit could not be completed: {e}"
 
     return "".join(output_parts)
 
@@ -102,10 +114,10 @@ def main() -> None:
         print("Usage: python audit_agent.py <path-to-file>")
         sys.exit(1)
 
-    target = sys.argv[1]
-    report = run_audit(target)
+    target: str = sys.argv[1]
+    report: str = run_audit(target)
 
-    output_path = Path("audit_report.md")
+    output_path: Path = Path("audit_report.md")
     output_path.write_text(report)
     print(f"\nReport saved to {output_path}")
 
