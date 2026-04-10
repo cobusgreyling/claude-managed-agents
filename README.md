@@ -2,6 +2,9 @@
 
 **One task. Four paradigms. See the difference.**
 
+
+![Four Ways To Build AI Agents with Anthropic](images/four-paradigms.png)
+
 This repository accompanies the blog post [Claude Managed Agents: The Fourth Way to Build AI Agents With Claude](blog/claude-managed-agents.md). It implements the **same task** — a security audit of a Python Flask application — using all four of Anthropic's agent paradigms.
 
 The goal: make the trade-offs between paradigms tangible by showing real code side by side.
